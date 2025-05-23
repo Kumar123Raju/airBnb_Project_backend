@@ -35,4 +35,8 @@ public class Payment {
     @CreationTimestamp
     private LocalDateTime updatedAt;
 
+    @OneToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name="booking_id")
+    private Booking booking;
+
 }
