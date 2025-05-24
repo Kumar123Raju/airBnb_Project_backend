@@ -3,13 +3,16 @@ package com.rajukumar.project.airBnbApp.service;
 import com.rajukumar.project.airBnbApp.dto.RoomDto;
 import com.rajukumar.project.airBnbApp.entity.Hotel;
 import com.rajukumar.project.airBnbApp.entity.Room;
+import com.rajukumar.project.airBnbApp.entity.User;
 import com.rajukumar.project.airBnbApp.exception.ResourceNotFoundException;
+import com.rajukumar.project.airBnbApp.exception.UnAuthoriseException;
 import com.rajukumar.project.airBnbApp.repository.HotelRepository;
 import com.rajukumar.project.airBnbApp.repository.RoomRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -33,6 +36,14 @@ public class RoomServiceImpl implements RoomService{
                 .orElseThrow(()-> new ResourceNotFoundException("Hotel not found with id: "+hotelId));
         Room room=modelMapper.map(roomDto,Room.class);
         room.setHotel(hotel);
+
+        //validate the user is authenticated or not
+
+        User user= (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        if(!user.equals(hotel.getOwner())){
+            throw new UnAuthoriseException("This user doest not own this hotel with id: "+hotelId);
+        }
+
         room=roomRepository.save(room);
         if(hotel.getActive()){
             inventoryService.initializeRoomForAYear(room);
@@ -69,6 +80,12 @@ public class RoomServiceImpl implements RoomService{
         log.info("Deleting the ID: {}",roomId);
         Room room=roomRepository.findById(roomId)
                 .orElseThrow(()->new ResourceNotFoundException("Room not found with Id:"+roomId));
+
+        User user=(User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        if(!user.equals(room.getHotel().getOwner())){
+            throw new UnAuthoriseException("This user doest not own this hotel with id: "+roomId);
+        }
+
         inventoryService.deleteAllInventories(room);
         roomRepository.deleteById(roomId);
     }
