@@ -48,6 +48,7 @@ public class BookingServiceImpl implements BookingService {
     private final GuestRepository guestRepository;
     private final CheckoutService checkoutService;
     private final PricingService pricingService;
+    private final EmailSenderService emailSenderService;
 
     @Value("${frontend.url}")
     private String frontendUrl;
@@ -170,8 +171,42 @@ public class BookingServiceImpl implements BookingService {
                 inventoryRepository.findAndLockReservedInventory(booking.getRoom().getId(),booking.getCheckInDate(),
                         booking.getCheckOutDate(),booking.getRoomsCount());
                 inventoryRepository.confirmBooking(booking.getRoom().getId(),booking.getCheckInDate(),booking.getCheckOutDate(),booking.getRoomsCount());
+                //once booking confirm then send email
+            if(booking.getBookingStatus()==BookingStatus.CONFIRMED) {
+                emailSenderService.sendEmail(
+                        booking.getUser().getEmail(),
+                        "BOOKING CONFIRMED",
+                        "Dear " + booking.getUser().getUsername() + ",\n\n" +
+                                "Thank you for your booking! Your reservation has been successfully confirmed.\n\n" +
+                                "Booking Details:\n" +
+                                "- Hotel Name: " + booking.getHotel().getName() + "\n" +
+                                "- Room ID: " + booking.getRoom().getId() + "\n" +
+                                "- Check-in: " + booking.getCheckInDate() + "\n" +
+                                "- Check-out: " + booking.getCheckOutDate() + "\n" +
+                                "- Payment Amount: ₹" + booking.getAmount() + "\n\n" +
+                                "We look forward to hosting you. If you have any questions or need to make changes to your reservation, feel free to contact us.\n\n" +
+                                "Best regards,\n" +
+                                "The Airbnb Team"
+                );
+            }else{
+                emailSenderService.sendEmail(
+                        booking.getUser().getEmail(),
+                        "PAYMENT FAILED – Booking Not Confirmed",
+                        "Dear " + booking.getUser().getUsername() + ",\n\n" +
+                                "We regret to inform you that your payment could not be processed, and your booking was not confirmed.\n\n" +
+                                "Booking Attempt Details:\n" +
+                                "- Hotel Name: " + booking.getHotel().getName() + "\n" +
+                                "- Room ID: " + booking.getRoom().getId() + "\n" +
+                                "- Intended Check-in: " + booking.getCheckInDate() + "\n" +
+                                "- Intended Check-out: " + booking.getCheckOutDate() + "\n\n" +
+                                "- Payment Amount: ₹" + booking.getAmount() + "\n\n" +
+                                "Please review your payment information and try again. If the problem persists, feel free to reach out to our support team for assistance.\n\n" +
+                                "We hope to help you complete your booking soon.\n\n" +
+                                "Best regards,\n" +
+                                "The Airbnb Team"
+                );
 
-
+            }
                 log.info("Booking confirmed for session ID: {}", sessionId);
             } else {
                 log.warn("unhandle for eventType: {}", event.getType());
@@ -199,7 +234,7 @@ public class BookingServiceImpl implements BookingService {
         inventoryRepository.findAndLockReservedInventory(booking.getRoom().getId(),booking.getCheckInDate(),
                 booking.getCheckOutDate(),booking.getRoomsCount());
         inventoryRepository.cancelBooking(booking.getRoom().getId(),booking.getCheckInDate(),booking.getCheckOutDate(),booking.getRoomsCount());
-//Handle the refund
+        //Handle the refund
         try {
             Session session = Session.retrieve(booking.getPaymentSessionId());
             RefundCreateParams refundCreateParams=RefundCreateParams.builder()
